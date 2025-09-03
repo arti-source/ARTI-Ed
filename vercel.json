@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "public": true,
+  "github": {
+    "enabled": true
+  },
+  "functions": {
+    "app/api/**/*.js": {
+      "runtime": "@vercel/node"
+    }
+  }
+}
