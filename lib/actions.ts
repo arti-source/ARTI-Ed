@@ -16,7 +16,7 @@ interface CheckoutData {
 
 export async function createCheckoutSession(data: CheckoutData) {
   try {
-    const headersList = headers()
+    const headersList = await headers()
     const origin = headersList.get('origin') || 'https://arti-ed.vercel.app'
 
     const session = await stripe.checkout.sessions.create({
