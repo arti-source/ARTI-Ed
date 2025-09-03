@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Get environment variables with fallbacks
+// Get environment variables with fallbacks for client-side
 function getSupabaseConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   
   // Debug logging
-  console.log('Supabase config check:', {
+  console.log('Supabase client config check:', {
     urlExists: !!url,
     keyExists: !!key,
     urlValue: url ? url.substring(0, 30) + '...' : 'undefined',
@@ -33,17 +33,5 @@ if (!supabaseAnonKey || supabaseAnonKey === 'undefined' || supabaseAnonKey.trim(
   throw new Error('Invalid Supabase anon key configuration')
 }
 
-// Client-side Supabase client
+// Client-side Supabase client - safe for browser use
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-// Server-side Supabase client (uses service role key)
-export const supabaseAdmin = createClient(
-  supabaseUrl,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    }
-  }
-)
