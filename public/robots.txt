@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://arti-ed.vercel.app/sitemap.xml
