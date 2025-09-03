@@ -142,7 +142,7 @@ export default function DashboardPage() {
       {/* Main Content */}
       <div className="max-w-6xl mx-auto p-8">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4 text-shadow-lg">
+          <h1 className="text-4xl font-bold mb-4" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
             Velkommen til ditt dashboard!
           </h1>
           <p className="text-xl opacity-90">Her har du oversikt over kurs og abonnement</p>
@@ -239,11 +239,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <style jsx>{`
-        .text-shadow-lg {
-          text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-      `}</style>
     </div>
   )
 }

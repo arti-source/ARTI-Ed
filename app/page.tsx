@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center max-w-2xl p-8">
-        <h1 className="text-5xl font-bold mb-4 text-shadow-lg">
+        <h1 className="text-5xl font-bold mb-4" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
           🎓 ARTI Ed
         </h1>
         <p className="text-xl mb-8 opacity-90">
@@ -34,12 +34,6 @@ export default function Home() {
           Kom i gang nå →
         </Link>
       </div>
-
-      <style jsx>{`
-        .text-shadow-lg {
-          text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-      `}</style>
     </div>
   )
 }

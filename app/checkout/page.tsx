@@ -158,7 +158,7 @@ export default function CheckoutPage() {
           ← Tilbake til planer
         </Link>
         
-        <h1 className="text-3xl font-bold text-center mb-8 text-shadow-lg">
+        <h1 className="text-3xl font-bold text-center mb-8" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
           🎓 Fullfør kjøp
         </h1>
         
@@ -239,11 +239,6 @@ export default function CheckoutPage() {
         )}
       </div>
 
-      <style jsx>{`
-        .text-shadow-lg {
-          text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-      `}</style>
     </div>
   )
 }
