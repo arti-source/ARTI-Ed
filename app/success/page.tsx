@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 
-export default function SuccessPage() {
+function SuccessContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [currentUser, setCurrentUser] = useState<any>(null)
@@ -146,5 +146,20 @@ export default function SuccessPage() {
         </Link>
       </div>
     </div>
+  )
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="bg-white/10 p-8 rounded-xl backdrop-blur-md shadow-xl border border-white/20 max-w-md w-full text-center">
+          <div className="text-6xl mb-4">⏳</div>
+          <p className="text-xl">Laster...</p>
+        </div>
+      </div>
+    }>
+      <SuccessContent />
+    </Suspense>
   )
 }
