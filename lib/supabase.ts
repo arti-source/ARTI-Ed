@@ -1,25 +1,36 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Environment variables for client-side Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://gfhcsypawnqiokdkduaz.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaGNzeXBhd25xaW9rZGtkdWF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MDI3NzMsImV4cCI6MjA3MjQ3ODc3M30.DjNG0BokHWg6eme7Mli2Hs1p8cusaNbJGQ9K5STNJkQ'
+// Get environment variables with fallbacks
+function getSupabaseConfig() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  
+  // Debug logging
+  console.log('Supabase config check:', {
+    urlExists: !!url,
+    keyExists: !!key,
+    urlValue: url ? url.substring(0, 30) + '...' : 'undefined',
+    keyValue: key ? key.substring(0, 20) + '...' : 'undefined',
+    nodeEnv: process.env.NODE_ENV
+  })
 
-// Debug environment variables
-console.log('Environment check:', {
-  url: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'from env' : 'fallback',
-  key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'from env' : 'fallback',
-  nodeEnv: process.env.NODE_ENV
-})
-
-// Validate required environment variables
-if (!supabaseUrl) {
-  console.error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
+  // Use hardcoded values as fallback (these are public keys, safe to commit)
+  return {
+    url: url || 'https://gfhcsypawnqiokdkduaz.supabase.co',
+    key: key || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaGNzeXBhd25xaW9rZGtkdWF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MDI3NzMsImV4cCI6MjA3MjQ3ODc3M30.DjNG0BokHWg6eme7Mli2Hs1p8cusaNbJGQ9K5STNJkQ'
+  }
 }
 
-if (!supabaseAnonKey) {
-  console.error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable')
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable')
+// Get configuration
+const { url: supabaseUrl, key: supabaseAnonKey } = getSupabaseConfig()
+
+// Validate configuration
+if (!supabaseUrl || supabaseUrl === 'undefined' || supabaseUrl.trim() === '') {
+  throw new Error('Invalid Supabase URL configuration')
+}
+
+if (!supabaseAnonKey || supabaseAnonKey === 'undefined' || supabaseAnonKey.trim() === '') {
+  throw new Error('Invalid Supabase anon key configuration')
 }
 
 // Client-side Supabase client
