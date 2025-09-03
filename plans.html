@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARTI Ed - Velg din plan</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 2rem 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        .plan-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .plan-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(31, 38, 135, 0.5);
+        }
+        .plan-card.popular {
+            border: 2px solid #FFD700;
+        }
+        .popular-badge {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #FFD700;
+            color: #333;
+            padding: 0.3rem 1rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .plan-name {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .plan-price {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .plan-price .currency {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+        .plan-period {
+            opacity: 0.8;
+            margin-bottom: 1rem;
+        }
+        .plan-description {
+            margin-bottom: 1.5rem;
+            opacity: 0.9;
+        }
+        .features {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 2rem;
+        }
+        .features li {
+            padding: 0.5rem 0;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+        .features li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .select-button {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .select-button:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        .plan-card.popular .select-button {
+            background: #FFD700;
+            color: #333;
+        }
+        .plan-card.popular .select-button:hover {
+            background: #FFC107;
+        }
+        .logout-btn {
+            position: absolute;
+            top: 2rem;
+            right: 2rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .error {
+            background: rgba(244, 67, 54, 0.8);
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            text-align: center;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <a href="#" onclick="logout()" class="logout-btn">Logg ut</a>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🎓 Velg din ARTI Ed plan</h1>
+            <p class="subtitle">Få tilgang til alle våre kurs og læringsressurser</p>
+        </div>
+
+        <div id="loading" class="loading">
+            <p>Laster planer...</p>
+        </div>
+
+        <div id="plans-container" style="display: none;">
+            <div class="plans-grid" id="plans-grid">
+                <!-- Plans will be loaded here -->
+            </div>
+        </div>
+
+        <div id="error-message"></div>
+    </div>
+
+    <script>
+        // Initialize Supabase client
+        const supabase = window.supabase.createClient(
+            'https://gfhcsypawnqiokdkduaz.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaGNzeXBhd25xaW9rZGtkdWF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MDI3NzMsImV4cCI6MjA3MjQ3ODc3M30.DjNG0BokHWg6eme7Mli2Hs1p8cusaNbJGQ9K5STNJkQ'
+        );
+
+        let currentUser = null;
+
+        // Check authentication and load plans
+        async function init() {
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (!session) {
+                window.location.href = 'auth.html';
+                return;
+            }
+
+            currentUser = session.user;
+            
+            // Check if user already has an active subscription
+            const { data: subscription } = await supabase
+                .from('subscriptions')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .eq('status', 'active')
+                .single();
+
+            if (subscription) {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+
+            await loadPlans();
+        }
+
+        async function loadPlans() {
+            try {
+                const { data: plans, error } = await supabase
+                    .from('subscription_plans')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('price_monthly');
+
+                if (error) {
+                    throw error;
+                }
+
+                displayPlans(plans);
+            } catch (error) {
+                showError('Kunne ikke laste planer: ' + error.message);
+            }
+        }
+
+        function displayPlans(plans) {
+            const plansGrid = document.getElementById('plans-grid');
+            const loadingEl = document.getElementById('loading');
+            const containerEl = document.getElementById('plans-container');
+
+            loadingEl.style.display = 'none';
+            containerEl.style.display = 'block';
+
+            plansGrid.innerHTML = plans.map((plan, index) => {
+                const isPopular = plan.plan_type === 'team';
+                const features = Array.isArray(plan.features) ? plan.features : [];
+                
+                return `
+                    <div class="plan-card ${isPopular ? 'popular' : ''}">
+                        ${isPopular ? '<div class="popular-badge">Mest populær</div>' : ''}
+                        <div class="plan-name">${plan.name}</div>
+                        <div class="plan-price">
+                            <span class="currency">kr</span> ${plan.price_monthly}
+                        </div>
+                        <div class="plan-period">
+                            ${plan.plan_type === 'team' ? 'per bruker/måned' : 'per måned'}
+                        </div>
+                        <div class="plan-description">${plan.description}</div>
+                        <ul class="features">
+                            ${features.map(feature => `<li>${feature}</li>`).join('')}
+                            ${plan.plan_type === 'team' ? '<li>Admin kontroller</li><li>Fakturaer per team</li>' : ''}
+                        </ul>
+                        <button class="select-button" onclick="selectPlan('${plan.id}', '${plan.plan_type}')">
+                            Velg ${plan.name}
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function selectPlan(planId, planType) {
+            if (!currentUser) {
+                window.location.href = 'auth.html';
+                return;
+            }
+
+            // Store selected plan in localStorage for checkout
+            const selectedPlan = {
+                planId: planId,
+                planType: planType,
+                userId: currentUser.id
+            };
+            
+            localStorage.setItem('selectedPlan', JSON.stringify(selectedPlan));
+            
+            // Redirect to checkout
+            window.location.href = 'checkout.html';
+        }
+
+        async function logout() {
+            await supabase.auth.signOut();
+            window.location.href = 'index.html';
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.innerHTML = `<div class="error">${message}</div>`;
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // Initialize on page load
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARTI Ed - Registrer deg eller logg inn</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.5);
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1rem;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        .switch {
+            text-align: center;
+            margin-top: 1rem;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .error {
+            background: rgba(244, 67, 54, 0.8);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.8);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+        }
+        #login-form, #signup-form {
+            display: none;
+        }
+        #signup-form.active, #login-form.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 ARTI Ed</h1>
+        
+        <!-- Login Form -->
+        <div id="login-form" class="active">
+            <h2>Logg inn</h2>
+            <div class="form-group">
+                <label for="login-email">E-post</label>
+                <input type="email" id="login-email" required>
+            </div>
+            <div class="form-group">
+                <label for="login-password">Passord</label>
+                <input type="password" id="login-password" required>
+            </div>
+            <button onclick="login()">Logg inn</button>
+            <div class="switch" onclick="switchToSignup()">
+                Har du ikke konto? Registrer deg her
+            </div>
+        </div>
+
+        <!-- Signup Form -->
+        <div id="signup-form">
+            <h2>Registrer deg</h2>
+            <div class="form-group">
+                <label for="signup-name">Fullt navn</label>
+                <input type="text" id="signup-name" required>
+            </div>
+            <div class="form-group">
+                <label for="signup-email">E-post</label>
+                <input type="email" id="signup-email" required>
+            </div>
+            <div class="form-group">
+                <label for="signup-password">Passord</label>
+                <input type="password" id="signup-password" required minlength="6">
+            </div>
+            <div class="form-group">
+                <label for="company-name">Bedriftsnavn (valgfri)</label>
+                <input type="text" id="company-name">
+            </div>
+            <button onclick="signup()">Registrer deg</button>
+            <div class="switch" onclick="switchToLogin()">
+                Har du allerede konto? Logg inn her
+            </div>
+        </div>
+
+        <div id="message"></div>
+    </div>
+
+    <script>
+        // Initialize Supabase client
+        const supabase = window.supabase.createClient(
+            'https://gfhcsypawnqiokdkduaz.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaGNzeXBhd25xaW9rZGtkdWF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MDI3NzMsImV4cCI6MjA3MjQ3ODc3M30.DjNG0BokHWg6eme7Mli2Hs1p8cusaNbJGQ9K5STNJkQ'
+        );
+
+        // Check if user is already logged in
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                window.location.href = 'plans.html';
+            }
+        });
+
+        function switchToSignup() {
+            document.getElementById('login-form').classList.remove('active');
+            document.getElementById('signup-form').classList.add('active');
+            clearMessage();
+        }
+
+        function switchToLogin() {
+            document.getElementById('signup-form').classList.remove('active');
+            document.getElementById('login-form').classList.add('active');
+            clearMessage();
+        }
+
+        function showMessage(message, isError = false) {
+            const messageEl = document.getElementById('message');
+            messageEl.innerHTML = message;
+            messageEl.className = isError ? 'error' : 'success';
+        }
+
+        function clearMessage() {
+            document.getElementById('message').innerHTML = '';
+        }
+
+        async function signup() {
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const fullName = document.getElementById('signup-name').value;
+            const companyName = document.getElementById('company-name').value;
+
+            if (!email || !password || !fullName) {
+                showMessage('Vennligst fyll ut alle påkrevde felt', true);
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: {
+                        data: {
+                            full_name: fullName,
+                            company_name: companyName
+                        }
+                    }
+                });
+
+                if (error) {
+                    showMessage('Registrering feilet: ' + error.message, true);
+                } else {
+                    showMessage('Sjekk e-posten din for bekreftelseslenke!');
+                }
+            } catch (error) {
+                showMessage('En feil oppstod: ' + error.message, true);
+            }
+        }
+
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            if (!email || !password) {
+                showMessage('Vennligst fyll ut alle felt', true);
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+                if (error) {
+                    showMessage('Innlogging feilet: ' + error.message, true);
+                } else {
+                    // Check if user has active subscription
+                    const { data: subscription, error: subError } = await supabase
+                        .from('subscriptions')
+                        .select('*')
+                        .eq('user_id', data.user.id)
+                        .eq('status', 'active')
+                        .single();
+
+                    if (subscription) {
+                        window.location.href = 'dashboard.html';
+                    } else {
+                        window.location.href = 'plans.html';
+                    }
+                }
+            } catch (error) {
+                showMessage('En feil oppstod: ' + error.message, true);
+            }
+        }
+
+        // Handle auth state changes
+        supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN') {
+                // User signed in successfully
+                console.log('User signed in');
+            }
+        });
+    </script>
+</body>
+</html>
