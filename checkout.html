@@ -184,7 +184,7 @@
     </div>
 
     <script>
-        // Initialize Supabase and Stripe
+        // Initialize Supabase and Stripe with hardcoded public keys
         const supabase = window.supabase.createClient(
             'https://gfhcsypawnqiokdkduaz.supabase.co',
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaGNzeXBhd25xaW9rZGtkdWF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MDI3NzMsImV4cCI6MjA3MjQ3ODc3M30.DjNG0BokHWg6eme7Mli2Hs1p8cusaNbJGQ9K5STNJkQ'
@@ -294,29 +294,32 @@
                 const quantity = planData.plan_type === 'team' ? 
                     parseInt(document.getElementById('team-size').value) || 1 : 1;
 
-                // Create Stripe Checkout Session
-                const { error } = await stripe.redirectToCheckout({
-                    lineItems: [{
-                        price: planData.stripe_price_id,
-                        quantity: quantity
-                    }],
-                    mode: 'subscription',
-                    successUrl: `${window.location.origin}/success.html?session_id={CHECKOUT_SESSION_ID}`,
-                    cancelUrl: `${window.location.origin}/checkout.html`,
-                    customerEmail: customerEmail,
-                    clientReferenceId: currentUser.id,
-                    metadata: {
+                // Create checkout session via our API
+                const response = await fetch('/api/create-checkout-session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        priceId: planData.stripe_price_id,
+                        quantity: quantity,
+                        customerEmail: customerEmail,
+                        userId: currentUser.id,
                         planId: selectedPlan.planId,
                         planType: planData.plan_type,
-                        userId: currentUser.id,
                         customerName: customerName,
                         companyName: companyName
-                    }
+                    })
                 });
 
-                if (error) {
-                    throw new Error(error.message);
+                const session = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(session.message || 'Failed to create checkout session');
                 }
+
+                // Redirect to Stripe Checkout
+                window.location.href = session.url;
 
             } catch (error) {
                 showMessage('Checkout feilet: ' + error.message, true);
