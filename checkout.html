@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARTI Ed - Checkout</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .plan-summary {
+            background: rgba(255,255,255,0.1);
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+        }
+        .plan-name {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .plan-price {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .plan-description {
+            opacity: 0.9;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.5);
+        }
+        button {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.3);
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1rem;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: rgba(255,255,255,0.4);
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .back-button {
+            background: rgba(255,255,255,0.1);
+            padding: 0.5rem 1rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            cursor: pointer;
+            text-decoration: none;
+            display: block;
+            border-radius: 5px;
+        }
+        .error {
+            background: rgba(244, 67, 54, 0.8);
+            color: white;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.8);
+            color: white;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+        }
+        #team-section {
+            display: none;
+        }
+        .team-info {
+            background: rgba(255,255,255,0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="plans.html" class="back-button">← Tilbake til planer</a>
+        
+        <h1>🎓 Fullfør kjøp</h1>
+        
+        <div id="loading" class="loading">
+            <p>Laster...</p>
+        </div>
+
+        <div id="checkout-form" style="display: none;">
+            <div class="plan-summary" id="plan-summary">
+                <!-- Plan details will be loaded here -->
+            </div>
+
+            <div id="team-section">
+                <div class="team-info">
+                    <p><strong>Team Plan:</strong> Du blir admin og kan invitere team-medlemmer etter kjøp.</p>
+                </div>
+                <div class="form-group">
+                    <label for="team-size">Antall team-medlemmer (inkludert deg)</label>
+                    <input type="number" id="team-size" min="1" max="50" value="1">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="customer-name">Fullt navn</label>
+                <input type="text" id="customer-name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="customer-email">E-post</label>
+                <input type="email" id="customer-email" required>
+            </div>
+
+            <div class="form-group">
+                <label for="company-name">Bedriftsnavn (valgfri)</label>
+                <input type="text" id="company-name">
+            </div>
+
+            <button id="checkout-button" onclick="proceedToStripe()">
+                Fortsett til betaling
+            </button>
+        </div>
+
+        <div id="message"></div>
+    </div>
+
+    <script>
+        // Initialize Supabase and Stripe
+        const supabase = window.supabase.createClient(
+            'https://gfhcsypawnqiokdkduaz.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaGNzeXBhd25xaW9rZGtkdWF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MDI3NzMsImV4cCI6MjA3MjQ3ODc3M30.DjNG0BokHWg6eme7Mli2Hs1p8cusaNbJGQ9K5STNJkQ'
+        );
+        
+        const stripe = Stripe('pk_live_51PFzIJFk08c0mcLVPEPQOmVVQFzgyo5hywXLfaRQO4Oefsi0VhbzUfVHlgjPD14gCTgIgKpZZsFfEY1JzveZoYMF00SZ8tUj8o');
+
+        let currentUser = null;
+        let selectedPlan = null;
+        let planData = null;
+
+        async function init() {
+            // Check authentication
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (!session) {
+                window.location.href = 'auth.html';
+                return;
+            }
+
+            currentUser = session.user;
+            
+            // Get selected plan from localStorage
+            const storedPlan = localStorage.getItem('selectedPlan');
+            if (!storedPlan) {
+                window.location.href = 'plans.html';
+                return;
+            }
+            
+            selectedPlan = JSON.parse(storedPlan);
+            await loadPlanData();
+        }
+
+        async function loadPlanData() {
+            try {
+                const { data: plan, error } = await supabase
+                    .from('subscription_plans')
+                    .select('*')
+                    .eq('id', selectedPlan.planId)
+                    .single();
+
+                if (error) throw error;
+                
+                planData = plan;
+                displayPlanSummary();
+                setupForm();
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('checkout-form').style.display = 'block';
+
+            } catch (error) {
+                showMessage('Kunne ikke laste plan data: ' + error.message, true);
+            }
+        }
+
+        function displayPlanSummary() {
+            const summaryEl = document.getElementById('plan-summary');
+            const price = planData.price_monthly;
+            
+            summaryEl.innerHTML = `
+                <div class="plan-name">${planData.name}</div>
+                <div class="plan-price">kr ${price.toFixed(2)} ${planData.plan_type === 'team' ? 'per bruker' : ''}/måned</div>
+                <div class="plan-description">${planData.description}</div>
+            `;
+
+            if (planData.plan_type === 'team') {
+                document.getElementById('team-section').style.display = 'block';
+                document.getElementById('team-size').addEventListener('input', updateTeamPrice);
+            }
+        }
+
+        function updateTeamPrice() {
+            const teamSize = document.getElementById('team-size').value || 1;
+            const basePrice = planData.price_monthly;
+            const totalPrice = basePrice * teamSize;
+            
+            const summaryEl = document.getElementById('plan-summary');
+            summaryEl.innerHTML = `
+                <div class="plan-name">${planData.name}</div>
+                <div class="plan-price">kr ${totalPrice.toFixed(2)}/måned (${teamSize} x kr ${basePrice.toFixed(2)})</div>
+                <div class="plan-description">${planData.description}</div>
+            `;
+        }
+
+        function setupForm() {
+            // Pre-fill user data
+            document.getElementById('customer-name').value = currentUser.user_metadata?.full_name || '';
+            document.getElementById('customer-email').value = currentUser.email;
+            document.getElementById('company-name').value = currentUser.user_metadata?.company_name || '';
+        }
+
+        async function proceedToStripe() {
+            const customerName = document.getElementById('customer-name').value;
+            const customerEmail = document.getElementById('customer-email').value;
+            const companyName = document.getElementById('company-name').value;
+            
+            if (!customerName || !customerEmail) {
+                showMessage('Vennligst fyll ut alle påkrevde felt', true);
+                return;
+            }
+
+            const button = document.getElementById('checkout-button');
+            button.disabled = true;
+            button.textContent = 'Behandler...';
+
+            try {
+                const quantity = planData.plan_type === 'team' ? 
+                    parseInt(document.getElementById('team-size').value) || 1 : 1;
+
+                // Create Stripe Checkout Session
+                const { error } = await stripe.redirectToCheckout({
+                    lineItems: [{
+                        price: planData.stripe_price_id,
+                        quantity: quantity
+                    }],
+                    mode: 'subscription',
+                    successUrl: `${window.location.origin}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+                    cancelUrl: `${window.location.origin}/checkout.html`,
+                    customerEmail: customerEmail,
+                    clientReferenceId: currentUser.id,
+                    metadata: {
+                        planId: selectedPlan.planId,
+                        planType: planData.plan_type,
+                        userId: currentUser.id,
+                        customerName: customerName,
+                        companyName: companyName
+                    }
+                });
+
+                if (error) {
+                    throw new Error(error.message);
+                }
+
+            } catch (error) {
+                showMessage('Checkout feilet: ' + error.message, true);
+                button.disabled = false;
+                button.textContent = 'Fortsett til betaling';
+            }
+        }
+
+        function showMessage(message, isError = false) {
+            const messageEl = document.getElementById('message');
+            messageEl.innerHTML = `<div class="${isError ? 'error' : 'success'}">${message}</div>`;
+        }
+
+        // Initialize on page load
+        init();
+    </script>
+</body>
+</html>
