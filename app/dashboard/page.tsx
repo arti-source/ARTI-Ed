@@ -23,7 +23,7 @@ interface TeamMember {
   user_profiles: {
     full_name: string
     email: string
-  }
+  } | null
 }
 
 export default function DashboardPage() {
@@ -116,8 +116,8 @@ export default function DashboardPage() {
         return
       }
 
-      const members = teamMembersData as TeamMember[]
-      setTeamMembers(members || [])
+      const members = (teamMembersData || []) as TeamMember[]
+      setTeamMembers(members)
 
       // Check if current user is admin
       const currentUserMembership = members?.find(member => member.user_id === currentUser?.id)
