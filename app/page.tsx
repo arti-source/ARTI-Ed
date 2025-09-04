@@ -28,7 +28,7 @@ export default function Home() {
         </p>
 
         <Link 
-          href="/auth"
+          href="/plans"
           className="inline-block px-8 py-4 bg-white/30 hover:bg-white/40 text-white no-underline rounded-full font-semibold text-lg transition-all duration-300 transform hover:-translate-y-1 backdrop-blur-md"
         >
           Kom i gang nå →

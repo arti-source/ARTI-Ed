@@ -18,30 +18,29 @@ export default function PlansPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [showRegistration, setShowRegistration] = useState(false)
+  const [selectedPlanForRegistration, setSelectedPlanForRegistration] = useState<{planId: string, planType: string} | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       
-      if (!session) {
-        router.push('/auth')
-        return
-      }
+      if (session) {
+        setCurrentUser(session.user)
+        
+        // Check if user already has an active subscription
+        const { data: subscription } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .eq('status', 'active')
+          .single()
 
-      setCurrentUser(session.user)
-      
-      // Check if user already has an active subscription
-      const { data: subscription } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .eq('status', 'active')
-        .single()
-
-      if (subscription) {
-        router.push('/dashboard')
-        return
+        if (subscription) {
+          router.push('/dashboard')
+          return
+        }
       }
 
       await loadPlans()
@@ -69,10 +68,13 @@ export default function PlansPage() {
 
   const selectPlan = (planId: string, planType: string) => {
     if (!currentUser) {
-      router.push('/auth')
+      // Store selected plan and show registration
+      setSelectedPlanForRegistration({ planId, planType })
+      setShowRegistration(true)
       return
     }
 
+    // User is already logged in, proceed to checkout
     const selectedPlan = {
       planId,
       planType,
@@ -81,6 +83,40 @@ export default function PlansPage() {
     
     localStorage.setItem('selectedPlan', JSON.stringify(selectedPlan))
     router.push('/checkout')
+  }
+
+  const handleRegistration = async (email: string, password: string, fullName: string, companyName?: string) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            company_name: companyName
+          }
+        }
+      })
+
+      if (error) {
+        alert('Registrering feilet: ' + error.message)
+        return
+      }
+
+      if (data.user) {
+        // Registration successful, proceed to checkout with selected plan
+        const selectedPlan = {
+          planId: selectedPlanForRegistration!.planId,
+          planType: selectedPlanForRegistration!.planType,
+          userId: data.user.id
+        }
+        
+        localStorage.setItem('selectedPlan', JSON.stringify(selectedPlan))
+        router.push('/checkout')
+      }
+    } catch (error) {
+      alert('En feil oppstod: ' + (error as Error).message)
+    }
   }
 
   const logout = async () => {
@@ -108,12 +144,25 @@ export default function PlansPage() {
 
   return (
     <div className="min-h-screen p-8">
-      <button
-        onClick={logout}
-        className="absolute top-8 right-8 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
-      >
-        Logg ut
-      </button>
+      {currentUser && (
+        <button
+          onClick={logout}
+          className="absolute top-8 right-8 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
+        >
+          Logg ut
+        </button>
+      )}
+      
+      {!currentUser && (
+        <div className="absolute top-8 right-8">
+          <button
+            onClick={() => router.push('/auth')}
+            className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
+          >
+            Logg inn
+          </button>
+        </div>
+      )}
       
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
@@ -190,6 +239,89 @@ export default function PlansPage() {
           })}
         </div>
       </div>
+
+      {/* Registration Modal */}
+      {showRegistration && selectedPlanForRegistration && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white/10 p-8 rounded-xl backdrop-blur-md shadow-xl border border-white/20 max-w-md w-full">
+            <h2 className="text-2xl font-bold mb-6 text-center">
+              Opprett konto for å fortsette
+            </h2>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault()
+              const form = e.target as HTMLFormElement
+              const formData = new FormData(form)
+              
+              const email = formData.get('email') as string
+              const password = formData.get('password') as string
+              const fullName = formData.get('fullName') as string
+              const companyName = formData.get('companyName') as string
+              
+              handleRegistration(email, password, fullName, companyName)
+            }} className="space-y-4">
+              
+              <div>
+                <label className="block mb-2 font-medium">Fullt navn</label>
+                <input
+                  type="text"
+                  name="fullName"
+                  required
+                  className="w-full p-3 rounded-lg bg-white/90 text-gray-800 border-none focus:ring-2 focus:ring-white/50"
+                />
+              </div>
+              
+              <div>
+                <label className="block mb-2 font-medium">E-post</label>
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  className="w-full p-3 rounded-lg bg-white/90 text-gray-800 border-none focus:ring-2 focus:ring-white/50"
+                />
+              </div>
+              
+              <div>
+                <label className="block mb-2 font-medium">Passord</label>
+                <input
+                  type="password"
+                  name="password"
+                  required
+                  minLength={6}
+                  className="w-full p-3 rounded-lg bg-white/90 text-gray-800 border-none focus:ring-2 focus:ring-white/50"
+                />
+              </div>
+              
+              {selectedPlanForRegistration.planType === 'team' && (
+                <div>
+                  <label className="block mb-2 font-medium">Bedriftsnavn (valgfri)</label>
+                  <input
+                    type="text"
+                    name="companyName"
+                    className="w-full p-3 rounded-lg bg-white/90 text-gray-800 border-none focus:ring-2 focus:ring-white/50"
+                  />
+                </div>
+              )}
+              
+              <div className="flex gap-4 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowRegistration(false)}
+                  className="flex-1 p-3 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                >
+                  Avbryt
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 p-3 bg-white/30 hover:bg-white/40 text-white font-semibold rounded-lg transition-colors"
+                >
+                  Opprett konto & fortsett
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   )
