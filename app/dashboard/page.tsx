@@ -35,13 +35,25 @@ interface TeamMember {
   } | null
 }
 
+interface TeamInvitation {
+  id: string
+  invited_email: string
+  status: string
+  expires_at: string
+  created_at: string
+}
+
 export default function DashboardPage() {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [teamInvitations, setTeamInvitations] = useState<TeamInvitation[]>([])
   const [isTeamAdmin, setIsTeamAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteLoading, setInviteLoading] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -142,8 +154,23 @@ export default function DashboardPage() {
       const currentUserMembership = members?.find(member => member.user_id === userId)
       setIsTeamAdmin(currentUserMembership?.role === 'admin')
 
+      // Load team invitations
+      const { data: invitationsData, error: invitationsError } = await supabase
+        .from('team_invitations')
+        .select('id, invited_email, status, expires_at, created_at')
+        .eq('subscription_id', subscriptionId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+
+      if (invitationsError) {
+        console.error('Invitations query error:', invitationsError)
+      } else {
+        setTeamInvitations(invitationsData || [])
+      }
+
       console.log('Team loaded:', {
         memberCount: members?.length || 0,
+        invitationCount: invitationsData?.length || 0,
         isAdmin: currentUserMembership?.role === 'admin',
         currentUserId: userId
       })
@@ -159,6 +186,42 @@ export default function DashboardPage() {
 
   const showAlert = (message: string) => {
     alert(message)
+  }
+
+  const sendInvitation = async () => {
+    if (!inviteEmail || !subscription) return
+
+    setInviteLoading(true)
+    try {
+      const { error } = await supabase
+        .from('team_invitations')
+        .insert([
+          {
+            subscription_id: subscription.id,
+            invited_email: inviteEmail,
+            invited_by: currentUser.id,
+            status: 'pending'
+          }
+        ])
+
+      if (error) {
+        throw error
+      }
+
+      setInviteEmail('')
+      setShowInviteModal(false)
+      showAlert(`Invitasjon sendt til ${inviteEmail}!`)
+      
+      // Refresh team invitations
+      if (subscription) {
+        await loadTeamInfo(subscription.id, currentUser.id)
+      }
+    } catch (error) {
+      console.error('Invitation error:', error)
+      showAlert('Kunne ikke sende invitasjon: ' + (error as Error).message)
+    } finally {
+      setInviteLoading(false)
+    }
   }
 
   if (loading) {
@@ -288,11 +351,14 @@ export default function DashboardPage() {
                   {isTeamAdmin ? 'Du er admin for dette teamet' : 'Du er medlem av dette teamet'}
                 </p>
                 <p>Team medlemmer: <strong>{teamMembers.length}</strong></p>
+                {teamInvitations.length > 0 && (
+                  <p>Pending invitasjoner: <strong>{teamInvitations.length}</strong></p>
+                )}
                 
                 {/* Team Members List */}
                 {teamMembers.length > 0 && (
                   <div className="mt-4">
-                    <h4 className="font-semibold mb-3">Medlemmer:</h4>
+                    <h4 className="font-semibold mb-3">Aktive medlemmer:</h4>
                     <div className="space-y-2">
                       {teamMembers.map((member) => (
                         <div 
@@ -321,20 +387,92 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Pending Invitations List */}
+                {teamInvitations.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="font-semibold mb-3">Pending invitasjoner:</h4>
+                    <div className="space-y-2">
+                      {teamInvitations.map((invitation) => (
+                        <div 
+                          key={invitation.id} 
+                          className="flex items-center justify-between p-3 bg-orange-500/10 rounded-lg border border-orange-500/20"
+                        >
+                          <div>
+                            <p className="font-medium">
+                              {invitation.invited_email}
+                            </p>
+                            <p className="text-sm opacity-75">
+                              Sendt: {new Date(invitation.created_at).toLocaleDateString('no-NO')}
+                            </p>
+                          </div>
+                          <div className="text-sm">
+                            <span className="px-2 py-1 rounded-full text-xs bg-orange-500/20 text-orange-300">
+                              Venter
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {isTeamAdmin && (
                 <button
-                  onClick={() => showAlert('Team administrasjon kommer snart!')}
+                  onClick={() => setShowInviteModal(true)}
                   className="px-6 py-2 bg-white/30 hover:bg-white/40 text-white rounded-lg transition-colors"
                 >
-                  Administrer team
+                  Inviter medlem
                 </button>
               )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Invite Modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white/90 backdrop-blur-md p-6 rounded-xl max-w-md w-full mx-4 border border-white/20">
+            <h3 className="text-xl font-bold mb-4 text-gray-800">Inviter nytt team-medlem</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email-adresse
+                </label>
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="navn@firma.no"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={sendInvitation}
+                  disabled={!inviteEmail || inviteLoading}
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {inviteLoading ? 'Sender...' : 'Send invitasjon'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowInviteModal(false)
+                    setInviteEmail('')
+                  }}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                >
+                  Avbryt
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
