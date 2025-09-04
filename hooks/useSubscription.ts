@@ -63,7 +63,7 @@ export function useSubscription(user: User | null): UseSubscriptionResult {
         return
       }
 
-      // Step 3: Fetch full subscription details with robustness
+      // Step 3: Fetch full subscription details
       const { data: subscriptionData, error: subError } = await supabase
         .from('subscriptions')
         .select(`
@@ -76,22 +76,14 @@ export function useSubscription(user: User | null): UseSubscriptionResult {
         `)
         .eq('id', subscriptionId)
         .eq('status', 'active')
-        .maybeSingle() // Use maybeSingle for robustness
+        .single()
 
       if (subError) {
         throw new Error(`Failed to fetch subscription details: ${subError.message}`)
       }
 
       if (!subscriptionData) {
-        console.log('ℹ️ No subscription found for ID:', subscriptionId)
-        setSubscription(null)
-        setIsLoading(false)
-        return
-      }
-
-      // Validate subscription has required plan relationship
-      if (!subscriptionData.subscription_plans) {
-        throw new Error('Subscription missing plan details - database inconsistency')
+        throw new Error('Subscription not found or inactive')
       }
 
       console.log('✅ Subscription loaded successfully:', subscriptionData.subscription_plans.plan_type)
