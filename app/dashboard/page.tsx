@@ -15,10 +15,22 @@ interface Subscription {
   }
 }
 
+interface TeamMember {
+  id: string
+  user_id: string
+  role: string
+  status: string
+  user_profiles: {
+    full_name: string
+    email: string
+  }
+}
+
 export default function DashboardPage() {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
-  const [teamCount, setTeamCount] = useState(1)
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [isTeamAdmin, setIsTeamAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -83,12 +95,39 @@ export default function DashboardPage() {
 
   const loadTeamInfo = async (subscriptionId: string) => {
     try {
-      const { data: teamMembers } = await supabase
+      // Get detailed team member information with user profiles
+      const { data: teamMembersData, error: teamError } = await supabase
         .from('team_memberships')
-        .select('*')
+        .select(`
+          id,
+          user_id,
+          role,
+          status,
+          user_profiles (
+            full_name,
+            email
+          )
+        `)
         .eq('subscription_id', subscriptionId)
+        .eq('status', 'active')
 
-      setTeamCount(teamMembers?.length || 1)
+      if (teamError) {
+        console.error('Team members query error:', teamError)
+        return
+      }
+
+      const members = teamMembersData as TeamMember[]
+      setTeamMembers(members || [])
+
+      // Check if current user is admin
+      const currentUserMembership = members?.find(member => member.user_id === currentUser?.id)
+      setIsTeamAdmin(currentUserMembership?.role === 'admin')
+
+      console.log('Team loaded:', {
+        memberCount: members?.length || 0,
+        isAdmin: currentUserMembership?.role === 'admin',
+        currentUserId: currentUser?.id
+      })
     } catch (error) {
       console.error('Could not load team info:', error)
     }
@@ -218,22 +257,61 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          {/* Team Admin (only for team plans) */}
+          {/* Team Section (only for team plans) */}
           {subscription?.subscription_plans.plan_type === 'team' && (
             <div className="bg-white/10 p-6 rounded-xl backdrop-blur-md border border-white/20">
               <div className="flex items-center gap-2 text-2xl font-bold mb-4">
-                👥 Team administrasjon
+                👥 {isTeamAdmin ? 'Team administrasjon' : 'Team medlemskap'}
               </div>
-              <div className="space-y-2 mb-6">
-                <p>Du er admin for dette teamet</p>
-                <p>Team medlemmer: <strong>{teamCount}</strong></p>
+              
+              <div className="space-y-3 mb-6">
+                <p>
+                  {isTeamAdmin ? 'Du er admin for dette teamet' : 'Du er medlem av dette teamet'}
+                </p>
+                <p>Team medlemmer: <strong>{teamMembers.length}</strong></p>
+                
+                {/* Team Members List */}
+                {teamMembers.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="font-semibold mb-3">Medlemmer:</h4>
+                    <div className="space-y-2">
+                      {teamMembers.map((member) => (
+                        <div 
+                          key={member.id} 
+                          className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+                        >
+                          <div>
+                            <p className="font-medium">
+                              {member.user_profiles?.full_name || 'Ukjent navn'}
+                            </p>
+                            <p className="text-sm opacity-75">
+                              {member.user_profiles?.email || 'Ingen email'}
+                            </p>
+                          </div>
+                          <div className="text-sm">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              member.role === 'admin' 
+                                ? 'bg-yellow-500/20 text-yellow-300' 
+                                : 'bg-blue-500/20 text-blue-300'
+                            }`}>
+                              {member.role === 'admin' ? 'Admin' : 'Medlem'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <button
-                onClick={() => showAlert('Team administrasjon kommer snart!')}
-                className="px-6 py-2 bg-white/30 hover:bg-white/40 text-white rounded-lg transition-colors"
-              >
-                Administrer team
-              </button>
+
+              {isTeamAdmin && (
+                <button
+                  onClick={() => showAlert('Team administrasjon kommer snart!')}
+                  className="px-6 py-2 bg-white/30 hover:bg-white/40 text-white rounded-lg transition-colors"
+                >
+                  Administrer team
+                </button>
+              )}
             </div>
           )}
         </div>
