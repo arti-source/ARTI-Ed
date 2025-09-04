@@ -22,7 +22,6 @@ interface TeamMemberRaw {
   status: string
   user_profiles: {
     full_name: string
-    email: string
   }[]
 }
 
@@ -33,7 +32,6 @@ interface TeamMember {
   status: string
   user_profiles: {
     full_name: string
-    email: string
   } | null
 }
 
@@ -115,8 +113,7 @@ export default function DashboardPage() {
           role,
           status,
           user_profiles (
-            full_name,
-            email
+            full_name
           )
         `)
         .eq('subscription_id', subscriptionId)
@@ -307,7 +304,7 @@ export default function DashboardPage() {
                               {member.user_profiles?.full_name || 'Ukjent navn'}
                             </p>
                             <p className="text-sm opacity-75">
-                              {member.user_profiles?.email || 'Ingen email'}
+                              ID: {member.user_id.substring(0, 8)}...
                             </p>
                           </div>
                           <div className="text-sm">
