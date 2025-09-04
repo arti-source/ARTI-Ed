@@ -92,7 +92,7 @@ export default function DashboardPage() {
       
       // If team plan, load team info
       if (subscriptionData.subscription_plans.plan_type === 'team') {
-        await loadTeamInfo(subscriptionData.id)
+        await loadTeamInfo(subscriptionData.id, userId)
       }
 
       setLoading(false)
@@ -102,7 +102,7 @@ export default function DashboardPage() {
     }
   }
 
-  const loadTeamInfo = async (subscriptionId: string) => {
+  const loadTeamInfo = async (subscriptionId: string, userId: string) => {
     try {
       // Get detailed team member information with user profiles
       const { data: teamMembersData, error: teamError } = await supabase
@@ -139,13 +139,13 @@ export default function DashboardPage() {
       setTeamMembers(members)
 
       // Check if current user is admin
-      const currentUserMembership = members?.find(member => member.user_id === currentUser?.id)
+      const currentUserMembership = members?.find(member => member.user_id === userId)
       setIsTeamAdmin(currentUserMembership?.role === 'admin')
 
       console.log('Team loaded:', {
         memberCount: members?.length || 0,
         isAdmin: currentUserMembership?.role === 'admin',
-        currentUserId: currentUser?.id
+        currentUserId: userId
       })
     } catch (error) {
       console.error('Could not load team info:', error)
