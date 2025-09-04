@@ -15,6 +15,17 @@ interface Subscription {
   }
 }
 
+interface TeamMemberRaw {
+  id: string
+  user_id: string
+  role: string
+  status: string
+  user_profiles: {
+    full_name: string
+    email: string
+  }[]
+}
+
 interface TeamMember {
   id: string
   user_id: string
@@ -116,7 +127,18 @@ export default function DashboardPage() {
         return
       }
 
-      const members = (teamMembersData || []) as TeamMember[]
+      // Transform raw data to expected format
+      const rawMembers = (teamMembersData || []) as TeamMemberRaw[]
+      const members: TeamMember[] = rawMembers.map(member => ({
+        id: member.id,
+        user_id: member.user_id,
+        role: member.role,
+        status: member.status,
+        user_profiles: member.user_profiles && member.user_profiles.length > 0 
+          ? member.user_profiles[0] 
+          : null
+      }))
+      
       setTeamMembers(members)
 
       // Check if current user is admin
