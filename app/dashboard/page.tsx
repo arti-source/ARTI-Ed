@@ -75,7 +75,42 @@ export default function DashboardPage() {
 
   const loadDashboardData = async (userId: string) => {
     try {
-      // Get user's subscription
+      // For team members, get subscription through team membership
+      const { data: teamMembership, error: teamError } = await supabase
+        .from('team_memberships')
+        .select('subscription_id, role')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .single()
+
+      let subscriptionId = null
+      
+      if (teamError && teamError.code !== 'PGRST116') {
+        // If team membership fails, try direct subscription lookup
+        const { data: directSub, error: directError } = await supabase
+          .from('subscriptions')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .single()
+        
+        if (directError && directError.code !== 'PGRST116') {
+          throw directError
+        }
+        
+        subscriptionId = directSub?.id
+      } else {
+        // Use subscription from team membership
+        subscriptionId = teamMembership?.subscription_id
+      }
+
+      if (!subscriptionId) {
+        // No active subscription found
+        router.push('/plans')
+        return
+      }
+
+      // Get full subscription data
       const { data: subscriptionData, error: subError } = await supabase
         .from('subscriptions')
         .select(`
@@ -86,8 +121,7 @@ export default function DashboardPage() {
             price_monthly
           )
         `)
-        .eq('user_id', userId)
-        .eq('status', 'active')
+        .eq('id', subscriptionId)
         .single()
 
       if (subError && subError.code !== 'PGRST116') {
