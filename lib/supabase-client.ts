@@ -14,10 +14,9 @@ function getSupabaseConfig() {
     nodeEnv: process.env.NODE_ENV
   })
 
-  // Use hardcoded values as fallback (these are public keys, safe to commit)
   return {
-    url: url || 'https://gfhcsypawnqiokdkduaz.supabase.co',
-    key: key || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaGNzeXBhd25xaW9rZGtkdWF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MDI3NzMsImV4cCI6MjA3MjQ3ODc3M30.DjNG0BokHWg6eme7Mli2Hs1p8cusaNbJGQ9K5STNJkQ'
+    url: url,
+    key: key
   }
 }
 
