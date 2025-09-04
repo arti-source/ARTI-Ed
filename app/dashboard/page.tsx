@@ -3,215 +3,62 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase-client'
-
-interface Subscription {
-  id: string
-  status: string
-  current_period_end: string
-  subscription_plans: {
-    name: string
-    plan_type: string
-    price_monthly: number
-  }
-}
-
-interface TeamMemberRaw {
-  id: string
-  user_id: string
-  role: string
-  status: string
-  user_profiles: {
-    full_name: string
-  }[]
-}
-
-interface TeamMember {
-  id: string
-  user_id: string
-  role: string
-  status: string
-  user_profiles: {
-    full_name: string
-  } | null
-}
-
-interface TeamInvitation {
-  id: string
-  invited_email: string
-  status: string
-  expires_at: string
-  created_at: string
-}
+import { useSubscription } from '@/hooks/useSubscription'
+import { useTeam } from '@/hooks/useTeam'
+import { useInvitations } from '@/hooks/useInvitations'
+import type { User } from '@/types/dashboard'
 
 export default function DashboardPage() {
-  const [currentUser, setCurrentUser] = useState<any>(null)
-  const [subscription, setSubscription] = useState<Subscription | null>(null)
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [teamInvitations, setTeamInvitations] = useState<TeamInvitation[]>([])
-  const [isTeamAdmin, setIsTeamAdmin] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
   const router = useRouter()
 
-  useEffect(() => {
-    const init = async () => {
-      // Check authentication
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        router.push('/auth')
-        return
-      }
+  // Custom hooks for data management
+  const { subscription, isLoading: subscriptionLoading, error: subscriptionError, refetch: refetchSubscription } = useSubscription(currentUser)
+  const { teamMembers, isTeamAdmin, isLoading: teamLoading, error: teamError, refetch: refetchTeam } = useTeam(currentUser, subscription)
+  const { invitations: teamInvitations, isLoading: invitationsLoading, error: invitationsError, sendInvitation, refetch: refetchInvitations } = useInvitations(currentUser, subscription, isTeamAdmin)
 
-      setCurrentUser(session.user)
-      await loadDashboardData(session.user.id)
+  // Combined loading state
+  const loading = authLoading || subscriptionLoading || teamLoading || invitationsLoading
+  
+  // Combined error state  
+  const error = subscriptionError || teamError || invitationsError
+
+  // Authentication effect
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session) {
+          router.push('/auth')
+          return
+        }
+
+        setCurrentUser(session.user as User)
+        console.log('✅ User authenticated:', session.user.id)
+        
+      } catch (err) {
+        console.error('❌ Auth error:', err)
+        router.push('/auth')
+      } finally {
+        setAuthLoading(false)
+      }
     }
 
-    init()
+    initAuth()
   }, [router])
 
-  const loadDashboardData = async (userId: string) => {
-    try {
-      // For team members, get subscription through team membership
-      const { data: teamMembership, error: teamError } = await supabase
-        .from('team_memberships')
-        .select('subscription_id, role')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .single()
-
-      let subscriptionId = null
-      
-      if (teamError && teamError.code !== 'PGRST116') {
-        // If team membership fails, try direct subscription lookup
-        const { data: directSub, error: directError } = await supabase
-          .from('subscriptions')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('status', 'active')
-          .single()
-        
-        if (directError && directError.code !== 'PGRST116') {
-          throw directError
-        }
-        
-        subscriptionId = directSub?.id
-      } else {
-        // Use subscription from team membership
-        subscriptionId = teamMembership?.subscription_id
-      }
-
-      if (!subscriptionId) {
-        // No active subscription found
-        router.push('/plans')
-        return
-      }
-
-      // Get full subscription data
-      const { data: subscriptionData, error: subError } = await supabase
-        .from('subscriptions')
-        .select(`
-          *,
-          subscription_plans (
-            name,
-            plan_type,
-            price_monthly
-          )
-        `)
-        .eq('id', subscriptionId)
-        .single()
-
-      if (subError && subError.code !== 'PGRST116') {
-        throw subError
-      }
-
-      if (!subscriptionData) {
-        // No active subscription - redirect to plans
-        router.push('/plans')
-        return
-      }
-
-      setSubscription(subscriptionData as Subscription)
-      
-      // If team plan, load team info
-      if (subscriptionData.subscription_plans.plan_type === 'team') {
-        await loadTeamInfo(subscriptionData.id, userId)
-      }
-
-      setLoading(false)
-    } catch (err) {
-      setError('Kunne ikke laste dashboard data: ' + (err as Error).message)
-      setLoading(false)
+  // Redirect to plans if no subscription found
+  useEffect(() => {
+    if (!authLoading && !subscriptionLoading && currentUser && !subscription && !subscriptionError) {
+      console.log('ℹ️ No subscription found, redirecting to plans')
+      router.push('/plans')
     }
-  }
-
-  const loadTeamInfo = async (subscriptionId: string, userId: string) => {
-    try {
-      // Get detailed team member information with user profiles
-      const { data: teamMembersData, error: teamError } = await supabase
-        .from('team_memberships')
-        .select(`
-          id,
-          user_id,
-          role,
-          status,
-          user_profiles (
-            full_name
-          )
-        `)
-        .eq('subscription_id', subscriptionId)
-        .eq('status', 'active')
-
-      if (teamError) {
-        console.error('Team members query error:', teamError)
-        return
-      }
-
-      // Transform raw data to expected format
-      const rawMembers = (teamMembersData || []) as TeamMemberRaw[]
-      const members: TeamMember[] = rawMembers.map(member => ({
-        id: member.id,
-        user_id: member.user_id,
-        role: member.role,
-        status: member.status,
-        user_profiles: member.user_profiles && member.user_profiles.length > 0 
-          ? member.user_profiles[0] 
-          : null
-      }))
-      
-      setTeamMembers(members)
-
-      // Check if current user is admin
-      const currentUserMembership = members?.find(member => member.user_id === userId)
-      setIsTeamAdmin(currentUserMembership?.role === 'admin')
-
-      // Load team invitations
-      const { data: invitationsData, error: invitationsError } = await supabase
-        .from('team_invitations')
-        .select('id, invited_email, status, expires_at, created_at')
-        .eq('subscription_id', subscriptionId)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-
-      if (invitationsError) {
-        console.error('Invitations query error:', invitationsError)
-      } else {
-        setTeamInvitations(invitationsData || [])
-      }
-
-      console.log('Team loaded:', {
-        memberCount: members?.length || 0,
-        invitationCount: invitationsData?.length || 0,
-        isAdmin: currentUserMembership?.role === 'admin',
-        currentUserId: userId
-      })
-    } catch (error) {
-      console.error('Could not load team info:', error)
-    }
-  }
+  }, [authLoading, subscriptionLoading, currentUser, subscription, subscriptionError, router])
 
   const logout = async () => {
     await supabase.auth.signOut()
@@ -222,37 +69,26 @@ export default function DashboardPage() {
     alert(message)
   }
 
-  const sendInvitation = async () => {
-    if (!inviteEmail || !subscription) return
+  const handleSendInvitation = async () => {
+    if (!inviteEmail.trim()) {
+      showAlert('Vennligst oppgi en gyldig e-postadresse')
+      return
+    }
 
     setInviteLoading(true)
+    
     try {
-      const { error } = await supabase
-        .from('team_invitations')
-        .insert([
-          {
-            subscription_id: subscription.id,
-            invited_email: inviteEmail,
-            invited_by: currentUser.id,
-            status: 'pending'
-          }
-        ])
-
-      if (error) {
-        throw error
-      }
-
-      setInviteEmail('')
-      setShowInviteModal(false)
-      showAlert(`Invitasjon sendt til ${inviteEmail}!`)
+      const success = await sendInvitation(inviteEmail)
       
-      // Refresh team invitations
-      if (subscription) {
-        await loadTeamInfo(subscription.id, currentUser.id)
+      if (success) {
+        setInviteEmail('')
+        setShowInviteModal(false)
+        showAlert(`Invitasjon sendt til ${inviteEmail}!`)
+      } else {
+        showAlert(invitationsError || 'Kunne ikke sende invitasjon')
       }
-    } catch (error) {
-      console.error('Invitation error:', error)
-      showAlert('Kunne ikke sende invitasjon: ' + (error as Error).message)
+    } catch (err) {
+      showAlert('Kunne ikke sende invitasjon: ' + (err as Error).message)
     } finally {
       setInviteLoading(false)
     }
@@ -487,7 +323,7 @@ export default function DashboardPage() {
               
               <div className="flex gap-3">
                 <button
-                  onClick={sendInvitation}
+                  onClick={handleSendInvitation}
                   disabled={!inviteEmail || inviteLoading}
                   className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
                 >
